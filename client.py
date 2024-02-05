@@ -24,7 +24,46 @@ def receive(sock):
         msg += chunk
     return msg
 
+def connectTcp(host, port, filename):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)
 
+        try:
+            sock.connect((host, port))
+            msg = receive(sock)
+                        
+            if msg == b"accio\r\n":
+                send(sock, b"confirm-accio\r\n")                
+                msg = receive(sock)
+                
+                if msg == b"accio\r\n":
+                    send(sock, b"confirm-accio-again\r\n")
+                    send(sock, b"\r\n")
+                    
+                    try:
+                        with open(filename, "rb") as f:
+                            while True:
+                                content = f.read(10000)
+                                if not content:
+                                    break
+                                send(sock, content)
+                                break
+                        f.close()
+                    except FileNotFoundError:
+                        sys.stderr.write("Error: File not found\n")
+                        sys.exit(1)
+                else:
+                    sys.stderr.write("Error: Invalid data from the server\n")
+                    sys.exit(1) 
+            else:
+                sys.stderr.write("Error: Invalid data from the server\n")
+                sys.exit(1)
+            #print("Connection Succeeded")
+        except Exception as e:
+            sys.stderr.write("ERROR: Connection failed")
+            sys.exit(1)           
+        finally:   
+            sock.close()
         
         
 def main():
