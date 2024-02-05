@@ -16,6 +16,31 @@ def send(sock, msg):
             sys.exit(1)
 
 
+        
+        
+def main():
+    
+    #sys.argv should look like --> python client.py <HOSTNAME-OR-IP> <PORT> <FILENAME>
+
+    if len(sys.argv[1:]) != 3:
+        sys.stderr.write("ERROR: Invalid number of arguments\n")
+        sys.exit(1)
+    
+    try:
+        port = int(sys.argv[1:][1])
+        if not(0 < port < 65535):
+            sys.stderr.write("ERROR: Invalid port number\n")
+            sys.exit(1)
+    
+    except ValueError:
+        sys.stderr.write("ERROR: Non-integer port number\n")
+        sys.exit(1)
+    
+    host = sys.argv[1:][0]
+    filename = sys.argv[1:][2]
+    
+    connectTcp(host, port, filename)
+    sys.exit(0)
   
 if __name__ == '__main__':
     main()
