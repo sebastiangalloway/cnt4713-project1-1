@@ -15,6 +15,15 @@ def send(sock, msg):
             sys.stderr.write("ERROR: sending data\n")
             sys.exit(1)
 
+def receive(sock):
+    msg = b""
+    while b"\r\n" not in msg:
+        chunk = sock.recv(10000)
+        if not chunk:
+            break
+        msg += chunk
+    return msg
+
 
         
         
