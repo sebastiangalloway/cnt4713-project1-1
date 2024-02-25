@@ -1,64 +1,48 @@
 #!/usr/bin/env python3
 
 import sys
-import argparse
 import socket
+import os
 import signal
-import struct
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
-import confundo
+def clientHandling(conn, addr, file_dir, file_count):
+    conn.send(b'accio\r\n')
+    with open(os.path.join(file_dir, str(file_count) + '.file'), 'wb') as f:
+        data = conn.recv(1024)
+        while data:
+            f.write(data)
+            data = conn.recv(1024)
+    conn.close()
 
-not_stopped = True
-
-parser = argparse.ArgumentParser("Parser")
-parser.add_argument("port", help="Set Port Number", type=int)
-args = parser.parse_args()
-
-def validate_port(portNumber):
-    try:
-        if portNumber < 1 or portNumber > 65535:
-            raise Exception()
-        return portNumber
-    except Exception as error:
-        sys.stderr.write("ERROR: This is NOT a valid port number.\n")
+def main(port, file_dir):
+    if port < 1 or port > 65535:
+        sys.stderr.write("ERROR: Invalid port number\n")
         sys.exit(1)
 
-def signalHandlers(signum_, frame_):
-    global not_stopped
-    not_stopped = False
-    exit(0)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(('0.0.0.0', port))
+        except OSError:
+            sys.stderr.write("ERROR: Port %d is already in use\n" % port)
+            sys.exit(1)
+        
+        s.listen(10)
 
-
-def handleSignals():
-    signal.signal(signal.SIGINT, signalHandlers)
-    signal.signal(signal.SIGTERM, signalHandlers)
-    signal.signal(signal.SIGQUIT, signalHandlers)
-
-
-def processConnection(clientSocket):
-    while True:
-        message = clientSocket.recv(confundo.MAX_PACKET_SIZE)
-        clientSocket.settimeout(confundo.GLOBAL_TIMEOUT)
-        if not message:
-            break
-
-
-def start():
-    global not_stopped
-    handleSignals()
-
-    try:
-        port = validate_port(args.port)
-        with confundo.Socket() as server:
-            server.bind(("0.0.0.0", port))
-
-            while not_stopped:
-                with server.accept() as clientSocket:
-                    processConnection(clientSocket)
-
-    except RuntimeError as e:
-        sys.stderr.write(f"ERROR: {e}\n")
-        sys.exit(1)
+        file_count = 1
+        while True:
+            conn, addr = s.accept()
+            t = threading.Thread(target=clientHandling, args=(conn, addr, file_dir, file_count))
+            t.start()
+            file_count += 1
 
 if __name__ == '__main__':
-    start()
+    
+    import argparse
+    parser = argparse.ArgumentParser(description='Accio Server')
+    parser.add_argument('port', type=int, help='Port number to listen on')
+    parser.add_argument('file_dir', help='Directory to save received files')
+    args = parser.parse_args()
+
+    main(args.port, args.file_dir)
