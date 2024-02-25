@@ -1,94 +1,158 @@
-#!/usr/bin/env python3
-
+# importing sys
 import sys
+# importing socket
 import socket
+# importing argparse
+import argparse
+# importing time
+import time
 
-def send(sock, msg):
-    total_sent = 0
-    while total_sent < len(msg):
-        try:
-            sent = sock.send(msg[total_sent:])
-            if sent == 0:
-                raise sock.error("ERROR: Connection broken")
-            total_sent += sent
-        except sock.error as e:
-            sys.stderr.write("ERROR: sending data\n")
-            sys.exit(1)
 
-def receive(sock):
-    msg = b""
-    while b"\r\n" not in msg:
-        chunk = sock.recv(10000)
-        if not chunk:
-            break
-        msg += chunk
-    return msg
+#print("client is running")
 
-def connectTcp(host, port, filename):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(10)
-
-        try:
-            sock.connect((host, port))
-            msg = receive(sock)
-                        
-            if msg == b"accio\r\n":
-                send(sock, b"confirm-accio\r\n")                
-                msg = receive(sock)
-                
-                if msg == b"accio\r\n":
-                    send(sock, b"confirm-accio-again\r\n")
-                    send(sock, b"\r\n")
-                    
-                    try:
-                        with open(filename, "rb") as f:
-                            while True:
-                                content = f.read(10000)
-                                if not content:
-                                    break
-                                send(sock, content)
-                                break
-                        f.close()
-                    except FileNotFoundError:
-                        sys.stderr.write("Error: File not found\n")
-                        sys.exit(1)
-                else:
-                    sys.stderr.write("Error: Invalid data from the server\n")
-                    sys.exit(1) 
-            else:
-                sys.stderr.write("Error: Invalid data from the server\n")
-                sys.exit(1)
-            #print("Connection Succeeded")
-        except Exception as e:
-            sys.stderr.write("ERROR: Connection failed")
-            sys.exit(1)           
-        finally:   
-            sock.close()
-        
-        
 def main():
-    
-    #sys.argv should look like --> python client.py <HOSTNAME-OR-IP> <PORT> <FILENAME>
-
-    if len(sys.argv[1:]) != 3:
-        sys.stderr.write("ERROR: Invalid number of arguments\n")
+    # If statement checking to make sure 4 arguments are passed
+    if len(sys.argv) != 4:
+        #print usage message if 4 arguments are not seen
+        print("Usage: python3 client.py <HOSTNAME-OR-IP> <PORT> <FILENAME>")
         sys.exit(1)
+
+    # Create an ArgumentParser object
+    argumentParse = argparse.ArgumentParser()
+    argumentParse.add_argument('hostname', type=str, help='<HOSTNAME-OR-IP>')
+    argumentParse.add_argument('port', type=int, help='<PORT>')
+    argumentParse.add_argument('filename', type=str, help='<FILENAME>')
+    args = argumentParse.parse_args()
+
+    # use the values of the command line arguments
+    hostname = args.hostname
+    port = args.port
+    filename = args.filename
+    # Initialize counter variable
+    accioCounter = 0
+    
+    # f-string to print hostname and port supplied
+    #print(f"Connecting to {hostname}:{port} ...")
     
     try:
-        port = int(sys.argv[1:][1])
-        if not(0 < port < 65535):
-            sys.stderr.write("ERROR: Invalid port number\n")
-            sys.exit(1)
-    
-    except ValueError:
-        sys.stderr.write("ERROR: Non-integer port number\n")
+        # creating new socket using socket method
+        # socket.AF_INET for the address and protocol family for IPv4
+        # socket.SOCK_STREAM Stream socket type, provides dual directional communication
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # set socket timeout to 10 seconds
+        sock.settimeout(10)
+        # connecting created socket to hostname and port
+        sock.connect((hostname, port))
+    # Catch a socket timeout error
+    except socket.timeout as exc:
+        # Print error message and exit with non-zero exit code
+        sys.stderr.write(f"ERROR: () Connection timed out 1: {exc}\n")
         sys.exit(1)
+    except ConnectionRefusedError as e:
+        # Print error message and exit with non-zero exit code
+        sys.stderr.write(f'ERROR: () {e}\n')
+        sys.exit(2)
+    # Catch a socket error
+    except socket.error as e:
+        # Print error message and exit with non-zero exit code
+        sys.stderr.write(f'ERROR: {e}\n')
+        sys.exit(2)
+    # Catch an overflow error
+    except OverflowError as o:
+        # Print error message and exit with non-zero exit code
+        sys.stderr.write(f'ERROR: {o}\n')
+        sys.exit(2)
+
     
-    host = sys.argv[1:][0]
-    filename = sys.argv[1:][2]
+    # Receive initial command from server
+    try:
+        severReceiving = sock.recv(1024)
+    except socket.timeout as exc:
+        # Print error message and exit with non-zero exit code
+        sys.stderr.write(f"ERROR: () Connection timed out 2: {exc}\n")
+        sys.exit(1)
+    # Checking if the data received is accio\r\n
+    except socket.error as e:
+        # Print error message and exit with non-zero exit code
+        sys.stderr.write(f'ERROR: {e}\n')
+        sys.exit(1)
+    if severReceiving == b"accio\r\n":
+        # increase accioCounter when data received is accio\r\n
+        accioCounter = accioCounter + 1        
+    else:
+        # else print message and exit if it did not
+        print("Did not receive 'accio\r\n' from the server")
+        sys.exit(1)
+   
+   
+   
+   
+        
+    # Receive second command from server
+    try:
+        severReceiving = sock.recv(1024)
+        
+    except socket.timeout as exc:
+        # Print error message and exit with non-zero exit code
+        sys.stderr.write(f"ERROR: () Connection timed out 3: {exc}\n")
+        sys.exit(1)
+        
+    except socket.error as e:
+        # Print error message and exit with non-zero exit code
+        sys.stderr.write(f'ERROR: {e}\n')
+        sys.exit(1)
+    # Checking if the data received is accio\r\n
+    if severReceiving == b"accio\r\n":
+        # increase accioCounter when data received is accio\r\n
+        accioCounter = accioCounter + 1        
+    else:
+        # else print message and exit if it did not
+        print("Did not receive 'accio\r\n' from the server")
+        sys.exit(1)
+
+
+
+    # Checking if 2 accio commands have been received 
+    if accioCounter != 2:
+        print("Error: Did not receive two 'accio' commands")
+        sys.exit(1) 
+    else:
+        # Sending confirm-accio if it matches
+        sock.send(b"confirm-accio\r\n")
+        # Send confirm-accio-again if it matches
+        sock.send(b"confirm-accio-again\r\n\r\n")
+
+    # with statement, to handle file stream
+    # open function to open file provided in args
+    # rb to read in binary file
+    with open(filename, "rb") as file:
+        # read first 1024 bytes of the file and store it in data
+        data = file.read(10000)
+        # while theres data to read
+        while data:
+            # send data to the server
+            sock.send(data)
+            # wait for 1 second before sending the next chunk of data
+            time.sleep(1)
+            # read the next 1024 bytes of the file and store it in data
+            data = file.read(10000)    
+
     
-    connectTcp(host, port, filename)
-    sys.exit(0)
-  
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
+
+"""
+#creating new socket using socket method
+#socket.AF_INET for the address and protocol family for IPv4
+#socket.SOCK_STREAM Stream socket type, provides dual directional communication
+#sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#print(sock)
+
+#sock.connect(("127.0.0.1", 12345))
+
+#l = sock.send(b"foobar\r\n")
+#print("send bytes", l)
+
+#b = sock.recv(1024)
+#print("Received: '%s" % b)
+"""
