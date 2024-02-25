@@ -1,48 +1,64 @@
 #!/usr/bin/env python3
 
-import sys
-import socket
-import os
-import signal
-import threading
-from concurrent.futures import ThreadPoolExecutor
+import socket, sys
 
-def clientHandling(conn, addr, file_dir, file_count):
-    conn.send(b'accio\r\n')
-    with open(os.path.join(file_dir, str(file_count) + '.file'), 'wb') as f:
-        data = conn.recv(1024)
-        while data:
-            f.write(data)
-            data = conn.recv(1024)
-    conn.close()
+class Server:
+    def __init__(self, sock = None, secs = 10):
+        if sock is None:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        else:
+            self.sock = sock
+        
+        self.sock.settimeout(secs)
+    
+    def connect(self, port, host = "0.0.0.0"):
+        try:
+            self.sock.bind((host, port))
+            self.sock.listen(10)
+        except socket.error as msg:
+            self.sock.close()
+            sys.stderr.write("ERROR: %s\n" % msg)
+            sys.exit(1)
 
-def main(port, file_dir):
+        connection, address = self.sock.accept()
+        data = ""
+                
+        with connection:
+            try:
+                data += connection.recv(4096)
+                print(data)
+                connection.send(b"Successfully connected to server")
+            except socket.error as msg:
+                self.sock.close()
+                connection.close()
+                sys.stderr.write("ERROR: %s\n" % msg)
+                sys.exit(1)
+            finally:
+                self.sock.close()
+                connection.close()
+                
+def main():
+    # Command line arguments format:
+    # python3 server.py <PORT> <FILE-DIR>
+    
+    if len(sys.argv) != 3:
+        sys.stderr.write("ERROR: Invalid number of arguments\n")
+        sys.exit(1)
+    
+    try:
+        port = int(sys.argv[1])
+    except ValueError:
+        sys.stderr.write("ERROR: Non-integer port number\n")
+        sys.exit(1)
+        
     if port < 1 or port > 65535:
         sys.stderr.write("ERROR: Invalid port number\n")
         sys.exit(1)
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            s.bind(('0.0.0.0', port))
-        except OSError:
-            sys.stderr.write("ERROR: Port %d is already in use\n" % port)
-            sys.exit(1)
         
-        s.listen(10)
-
-        file_count = 1
-        while True:
-            conn, addr = s.accept()
-            t = threading.Thread(target=clientHandling, args=(conn, addr, file_dir, file_count))
-            t.start()
-            file_count += 1
-
-if __name__ == '__main__':
+    file_directory = sys.argv[2]
     
-    import argparse
-    parser = argparse.ArgumentParser(description='Accio Server')
-    parser.add_argument('port', type=int, help='Port number to listen on')
-    parser.add_argument('file_dir', help='Directory to save received files')
-    args = parser.parse_args()
-
-    main(args.port, args.file_dir)
+    s = Server()
+    s.connect(port)
+    
+if __name__ == '__main__':
+    main()
