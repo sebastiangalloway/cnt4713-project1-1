@@ -1,5 +1,5 @@
-import socket, sys
-
+import sys
+import socket
 host = '0.0.0.0'
 port = sys.argv[1]
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
