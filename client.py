@@ -1,94 +1,93 @@
 #!/usr/bin/env python3
 
+import time
 import sys
 import socket
 
-def send(sock, msg):
-    total_sent = 0
-    while total_sent < len(msg):
+def validatePort(port):
+    if not isinstance(port, int):
+        sys.stderr.write("ERROR: Port is not an integer!")
+        sys.exit(1)
+
+    if not 1 <= port <= 65535:
+        sys.stderr.write("ERROR: Port is not valid range.")
+        sys.exit(1)
+
+
+
+class client:
+    domain_name = 0
+    host_port = 0
+    file_name = 0
+
+    def __init__(self):
+        self.domain_name = sys.argv[1]
+        self.host_port = int(sys.argv[2])
+        self.file_name = sys.argv[3]
+
+    def makeConnection(self):
+        connection = 0
         try:
-            sent = sock.send(msg[total_sent:])
-            if sent == 0:
-                raise sock.error("ERROR: Connection broken")
-            total_sent += sent
-        except sock.error as e:
-            sys.stderr.write("ERROR: sending data\n")
+            connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        except socket.error as err:
+            sys.stderr.write("ERROR: Socket Creation failed!")
+            sys.exit(1)
+            return False
+
+        try:
+            self.domain_name = socket.gethostbyname(self.domain_name)
+
+        except socket.gaierror:
+            sys.stderr.write("ERROR: The host could not be reached!")
             sys.exit(1)
 
-def receive(sock):
-    msg = b""
-    while b"\r\n" not in msg:
-        chunk = sock.recv(10000)
-        if not chunk:
-            break
-        msg += chunk
-    return msg
-
-def connectTcp(host, port, filename):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(10)
 
         try:
-            sock.connect((host, port))
-            msg = receive(sock)
-                        
-            if msg == b"accio\r\n":
-                send(sock, b"confirm-accio\r\n")                
-                msg = receive(sock)
-                
-                if msg == b"accio\r\n":
-                    send(sock, b"confirm-accio-again\r\n")
-                    send(sock, b"\r\n")
-                    
-                    try:
-                        with open(filename, "rb") as f:
-                            while True:
-                                content = f.read(10000)
-                                if not content:
-                                    break
-                                send(sock, content)
-                                break
-                        f.close()
-                    except FileNotFoundError:
-                        sys.stderr.write("Error: File not found\n")
-                        sys.exit(1)
-                else:
-                    sys.stderr.write("Error: Invalid data from the server\n")
-                    sys.exit(1) 
-            else:
-                sys.stderr.write("Error: Invalid data from the server\n")
-                sys.exit(1)
-            #print("Connection Succeeded")
-        except Exception as e:
-            sys.stderr.write("ERROR: Connection failed")
-            sys.exit(1)           
-        finally:   
-            sock.close()
-        
-        
-def main():
-    
-    #sys.argv should look like --> python client.py <HOSTNAME-OR-IP> <PORT> <FILENAME>
+            validatePort(self.host_port)
 
-    if len(sys.argv[1:]) != 3:
-        sys.stderr.write("ERROR: Invalid number of arguments\n")
-        sys.exit(1)
-    
-    try:
-        port = int(sys.argv[1:][1])
-        if not(0 < port < 65535):
-            sys.stderr.write("ERROR: Invalid port number\n")
+        except socket.error as err:
+            sys.stderr.write("ERROR: Port is not in valid rang4e!")
             sys.exit(1)
-    
-    except ValueError:
-        sys.stderr.write("ERROR: Non-integer port number\n")
-        sys.exit(1)
-    
-    host = sys.argv[1:][0]
-    filename = sys.argv[1:][2]
-    
-    connectTcp(host, port, filename)
-    sys.exit(0)
-  
-if __name__ == '__main__':
-    main()
+
+        try:
+
+            sys.stderr.write("ERROR: ")
+            connection.settimeout(10)
+            connection.connect((self.domain_name, self.host_port))
+            while True:
+                data = connection.recv(1024)
+                if data:
+                    stuff = connection.send(b'confirm-accio\r\n')
+
+                    while True:
+                        data1=connection.recv(1024)
+                        if data1:
+                            stuff2 = connection.send(b'confirm-accio-again\r\n')
+                            break
+                    break
+
+            stuff2 = connection.send(b'\r\n')
+
+            sendfile = open(self.file_name, "rb")
+
+            while True:
+                sendbytes = sendfile.read(10000)
+                if len(sendbytes) == 0:
+                    break
+                connection.send(sendbytes)
+
+
+
+        except socket.error:
+            print("ERROR: Connection failed!")
+            sys.exit(1)
+            return False
+
+
+
+
+
+
+host = client()
+host.makeConnection()
